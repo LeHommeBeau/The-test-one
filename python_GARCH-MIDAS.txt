@@ -1,0 +1,59 @@
+# 导入所需的库
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+import matplotlib.pyplot as plt
+
+# 读取数据，假设已经计算好了多组高频数据的日收益率和低频数据的月波动率，并保存在excel文件中
+data = pd.read_excel('data.xlsx')
+
+# 设置GARCH-MIDAS模型的参数，假设使用(1,1)阶的GARCH模型和12个月的MIDAS模型
+p = 1
+q = 1
+m = 12
+
+# 设置高频数据和低频数据的列名，假设有3组高频数据和低频数据
+y_cols = ['return_1', 'return_2', 'return_3'] # 高频数据的日收益率列名
+x_cols = ['vol_1', 'vol_2', 'vol_3'] # 低频数据的月波动率列名
+
+# 创建一个字典来保存每组数据的拟合结果
+results_dict = {}
+
+# 用一个循环来遍历所有的高频数据和低频数据，分别拟合GARCH-MIDAS模型，并把结果保存在字典中
+for i in range(len(y_cols)):
+    y = data[y_cols[i]] # 取出第i组高频数据的日收益率序列
+    x = data[x_cols[i]] # 取出第i组低频数据的月波动率序列
+
+    # 创建GARCH-MIDAS模型对象
+    model = GARCH_MIDAS(y, x, p, q, m)
+
+    # 拟合模型，得到结果
+    results = model.fit()
+
+    # 把结果保存在字典中，以高频数据的列名为键
+    results_dict[y_cols[i]] = results
+
+# 打印结果
+for key, value in results_dict.items():
+    print(f'拟合结果 for {key}:')
+    print(value.summary())
+
+# 画出残差的正态概率图，检验残差是否服从正态分布
+fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+for i in range(len(y_cols)):
+    ax = axes[i]
+    sm.qqplot(results_dict[y_cols[i]].resid, line='s', ax=ax)
+    ax.set_title(f'QQ plot for {y_cols[i]}')
+plt.show()
+
+# 画出部分回归图，检验每个自变量对因变量的影响是否线性
+fig, axes = plt.subplots(3, 2, figsize=(15, 15))
+for i in range(len(y_cols)):
+    ax1 = axes[i][0]
+    ax2 = axes[i][1]
+    sm.graphics.plot_partregress('prestige', 'income', ['education'], data=data, obs_labels=False, ax=ax1)
+    sm.graphics.plot_partregress('prestige', 'education', ['income'], data=data, obs_labels=False, ax=ax2)
+    ax1.set_title(f'Partial regression plot for income on {y_cols[i]}')
+    ax2.set_title(f'Partial regression plot for education on {y_cols[i]}')
+plt.show()
